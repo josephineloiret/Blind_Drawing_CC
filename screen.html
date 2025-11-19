@@ -1,8 +1,73 @@
 <!doctype html>
-<html>
-  <head><meta charset="utf-8"><title>Project1</title></head>
-  <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
-    <script src="draw.js"></script>
-  </body>
-</html
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blind Drawing - Computational Creativity</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    #container {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 30px;
+      max-width: 1600px;
+      width: 100%;
+    }
+    
+    h1 {
+      font-size: 2.5em;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    
+    .subtitle {
+      text-align: center;
+      color: #718096;
+      font-size: 1.1em;
+      margin-bottom: 30px;
+      font-weight: 300;
+    }
+    
+    #canvas-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    
+    canvas {
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h1>Blind Drawing</h1>
+    <p class="subtitle">Draw without seeing • Embrace the unexpected • Discover creativity</p>
+    <div id="canvas-container"></div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <script src="draw.js"></script>
+</body>
+</html>
