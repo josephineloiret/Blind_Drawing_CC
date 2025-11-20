@@ -2,9 +2,9 @@ let hidden_drawing;
 let hidden=true;
 let X;
 let Y;
-let color = [0, 0, 0]; //RGB color array
-let colorPickerX = 470;
-let colorPickerY = 37;
+let color = [0, 0, 0]; //color array
+let colorPickerX = 470; //x position of color box
+let colorPickerY = 37; //y position of color box
 let colorPickerWidth = 200;
 let colorPickerHeight = 70; //reduced to fit in panel
 let colorPickerBuffer;
