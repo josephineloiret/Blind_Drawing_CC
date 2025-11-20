@@ -25,11 +25,29 @@ let selectStartX, selectStartY; //start position of selection drag
 const PERIWINKLE_R = 160;
 const PERIWINKLE_G = 160;
 const PERIWINKLE_B = 225;
+//responsive canvas sizing
+const BASE_WIDTH = 1500;
+const BASE_HEIGHT = 800;
+let canvasScale = 1;
 
 function setup(){
-  let canvas = createCanvas(1500, 800);
+  //calculate canvas size to fit viewport
+  let availableWidth = windowWidth - 100; //leave some margin
+  let availableHeight = windowHeight - 200; //leave room for title/subtitle and margins
+  
+  //calculate scale to fit base dimensions within available space
+  let scaleX = availableWidth / BASE_WIDTH;
+  let scaleY = availableHeight / BASE_HEIGHT;
+  canvasScale = min(scaleX, scaleY, 1); //never scale up, only down
+  
+  //create canvas with scaled dimensions
+  let canvasWidth = BASE_WIDTH * canvasScale;
+  let canvasHeight = BASE_HEIGHT * canvasScale;
+  let canvas = createCanvas(canvasWidth, canvasHeight);
   canvas.parent('canvas-container');
-  hidden_drawing=createGraphics(1500,800); //size of hidden drawing
+  
+  //hidden drawing uses base dimensions for quality
+  hidden_drawing=createGraphics(BASE_WIDTH, BASE_HEIGHT);
   hidden_drawing.background('white'); //drawing background
   hidden_drawing.stroke(0); //drawing color
   hidden_drawing.strokeWeight(brushSize); //thickness of drawing
@@ -45,7 +63,7 @@ function draw(){
   
   //show drawing or not
   if (!hidden){ //if hidden is false, drawing will be shown fully
-    image(hidden_drawing,0,0);
+    image(hidden_drawing, 0, 0, width, height);
   } else {
     //if hidden is true, show black overlay
     if (selectionRect === null) {
@@ -64,14 +82,14 @@ function draw(){
       //use clip to show only the selected rectangle area
       drawingContext.save();
       drawingContext.beginPath();
-      let x1 = min(selectionRect.x1, selectionRect.x2);
-      let y1 = min(selectionRect.y1, selectionRect.y2);
-      let x2 = max(selectionRect.x1, selectionRect.x2);
-      let y2 = max(selectionRect.y1, selectionRect.y2);
+      let x1 = min(selectionRect.x1, selectionRect.x2) * canvasScale;
+      let y1 = min(selectionRect.y1, selectionRect.y2) * canvasScale;
+      let x2 = max(selectionRect.x1, selectionRect.x2) * canvasScale;
+      let y2 = max(selectionRect.y1, selectionRect.y2) * canvasScale;
       drawingContext.rect(x1, y1, x2 - x1, y2 - y1);
       drawingContext.clip();
       //show drawing in clipped area
-      image(hidden_drawing, 0, 0);
+      image(hidden_drawing, 0, 0, width, height);
       drawingContext.restore();
       pop();
     }
@@ -85,10 +103,12 @@ function draw(){
       noFill();
       stroke(255, 255, 0); //yellow outline
       strokeWeight(2);
-      let x1 = min(selectStartX, mouseX);
-      let y1 = min(selectStartY, mouseY);
-      let x2 = max(selectStartX, mouseX);
-      let y2 = max(selectStartY, mouseY);
+      let currentDrawingX = getDrawingX(mouseX);
+      let currentDrawingY = getDrawingY(mouseY);
+      let x1 = min(selectStartX, currentDrawingX) * canvasScale;
+      let y1 = min(selectStartY, currentDrawingY) * canvasScale;
+      let x2 = max(selectStartX, currentDrawingX) * canvasScale;
+      let y2 = max(selectStartY, currentDrawingY) * canvasScale;
       rect(x1, y1, x2 - x1, y2 - y1);
       pop();
     } else if (selectionRect !== null) {
@@ -97,10 +117,10 @@ function draw(){
       noFill();
       stroke(255, 255, 255); //white outline
       strokeWeight(2);
-      let x1 = min(selectionRect.x1, selectionRect.x2);
-      let y1 = min(selectionRect.y1, selectionRect.y2);
-      let x2 = max(selectionRect.x1, selectionRect.x2);
-      let y2 = max(selectionRect.y1, selectionRect.y2);
+      let x1 = min(selectionRect.x1, selectionRect.x2) * canvasScale;
+      let y1 = min(selectionRect.y1, selectionRect.y2) * canvasScale;
+      let x2 = max(selectionRect.x1, selectionRect.x2) * canvasScale;
+      let y2 = max(selectionRect.y2, selectionRect.y2) * canvasScale;
       rect(x1, y1, x2 - x1, y2 - y1);
       pop();
     }
@@ -184,6 +204,9 @@ function rgbToHsv(r, g, b) {
 }
 
 function drawColorPicker(){
+  push();
+  scale(canvasScale);
+  
   //draw cached color picker (no separate background - uses main panel background)
   image(colorPickerBuffer, colorPickerX, colorPickerY);
   
@@ -208,6 +231,8 @@ function drawColorPicker(){
   stroke(isDark ? 255 : 0);
   strokeWeight(2);
   circle(selectorX, selectorY, 10);
+  
+  pop();
 }
 
 function hsvToRgb(h, s, v) {
@@ -236,16 +261,20 @@ function hsvToRgb(h, s, v) {
 }
 
 function getColorFromPicker(mx, my) {
+  //convert screen coordinates to base UI coordinates
+  let baseX = mx / canvasScale;
+  let baseY = my / canvasScale;
+  
   //check if click is within color picker bounds
-  if (mx < colorPickerX || mx > colorPickerX + colorPickerWidth ||
-      my < colorPickerY || my > colorPickerY + colorPickerHeight) {
+  if (baseX < colorPickerX || baseX > colorPickerX + colorPickerWidth ||
+      baseY < colorPickerY || baseY > colorPickerY + colorPickerHeight) {
     return null;
   }
   
   //calculate hue based on x position (0 to 360 degrees)
-  let hue = map(mx, colorPickerX, colorPickerX + colorPickerWidth, 0, 360);
+  let hue = map(baseX, colorPickerX, colorPickerX + colorPickerWidth, 0, 360);
   //calculate brightness/value based on y position (100% at top, 0% at bottom)
-  let bright = map(my, colorPickerY, colorPickerY + colorPickerHeight, 100, 0);
+  let bright = map(baseY, colorPickerY, colorPickerY + colorPickerHeight, 100, 0);
   
   //calculate saturation: 0% at very top (white), 100% in upper-middle, then decrease as we approach black
   let sat;
@@ -265,10 +294,13 @@ function getColorFromPicker(mx, my) {
 }
 
 function drawInstructions(){
+  push();
+  scale(canvasScale);
+  
   //draw clean panel background - reduced height since no title
   fill(255, 255, 255, 250);
   noStroke();
-  rect(0, 0, width, 120);
+  rect(0, 0, BASE_WIDTH, 120);
   
   //left side buttons - before color (stacked vertically)
   let buttonSpacing = 12; //consistent spacing between buttons
@@ -520,6 +552,8 @@ function drawInstructions(){
   textAlign(CENTER);
   text('Clear Drawing', saveBtnX + rightBtnWidth/2, clearDrawBtnY + 25);
   textAlign(LEFT);
+  
+  pop();
 }
 
 function drawBrushSizeSlider(){
@@ -561,6 +595,10 @@ function drawBrushSizeSlider(){
 
 //start drawing function
 function mousePressed(){
+  //convert mouse coordinates to base UI coordinates for UI checks
+  let uiMouseX = mouseX / canvasScale;
+  let uiMouseY = mouseY / canvasScale;
+  
   //check if clicking on selection mode button (left side - top, stacked)
   let buttonSpacing = 12;
   let leftBtnWidth = 170;
@@ -570,8 +608,8 @@ function mousePressed(){
   let leftBtnX = 20;
   
   let selectModeBtnY = leftButtonsCenterY - totalLeftButtonsHeight / 2;
-  if (mouseX >= leftBtnX && mouseX <= leftBtnX + leftBtnWidth &&
-      mouseY >= selectModeBtnY && mouseY <= selectModeBtnY + leftBtnHeight) {
+  if (uiMouseX >= leftBtnX && uiMouseX <= leftBtnX + leftBtnWidth &&
+      uiMouseY >= selectModeBtnY && uiMouseY <= selectModeBtnY + leftBtnHeight) {
     selectionMode = !selectionMode;
     selectingRect = false;
     return;
@@ -579,8 +617,8 @@ function mousePressed(){
   
   //check if clicking on Reveal/Hide button (left side - below Selection Mode)
   let revealBtnY = selectModeBtnY + leftBtnHeight + buttonSpacing;
-  if (mouseX >= leftBtnX && mouseX <= leftBtnX + leftBtnWidth &&
-      mouseY >= revealBtnY && mouseY <= revealBtnY + leftBtnHeight) {
+  if (uiMouseX >= leftBtnX && uiMouseX <= leftBtnX + leftBtnWidth &&
+      uiMouseY >= revealBtnY && uiMouseY <= revealBtnY + leftBtnHeight) {
     hidden = !hidden;
     return;
   }
@@ -588,8 +626,8 @@ function mousePressed(){
   //check if clicking on clear selection button
   if (selectionRect !== null) {
     let clearSelBtnX = leftBtnX + leftBtnWidth + buttonSpacing;
-    if (mouseX >= clearSelBtnX && mouseX <= clearSelBtnX + 140 &&
-        mouseY >= revealBtnY && mouseY <= revealBtnY + leftBtnHeight) {
+    if (uiMouseX >= clearSelBtnX && uiMouseX <= clearSelBtnX + 140 &&
+        uiMouseY >= revealBtnY && uiMouseY <= revealBtnY + leftBtnHeight) {
       selectionRect = null;
       return;
     }
@@ -598,11 +636,11 @@ function mousePressed(){
   //if in selection mode, start creating selection rectangle
   if (selectionMode) {
     //don't start selection if clicking in UI area
-    if (mouseY < 120) return;
+    if (uiMouseY < 120) return;
     
     selectingRect = true;
-    selectStartX = mouseX;
-    selectStartY = mouseY;
+    selectStartX = getDrawingX(mouseX);
+    selectStartY = getDrawingY(mouseY);
     return; //don't draw when in selection mode
   }
   
@@ -621,10 +659,10 @@ function mousePressed(){
   let brushBtnHeight = 30;
   let brushSpacing = 8; //increased spacing
   
-  if (mouseY >= brushY && mouseY <= brushY + brushBtnHeight + 20) {
+  if (uiMouseY >= brushY && uiMouseY <= brushY + brushBtnHeight + 20) {
     for (let i = 0; i < brushTypes.length; i++) {
       let btnX = brushX + i * (brushBtnWidth + brushSpacing);
-      if (mouseX >= btnX && mouseX <= btnX + brushBtnWidth) {
+      if (uiMouseX >= btnX && uiMouseX <= btnX + brushBtnWidth) {
         brushType = brushTypes[i];
         return; //don't start drawing if selecting brush type
       }
@@ -638,8 +676,8 @@ function mousePressed(){
   let thumbY = brushSizeSliderY;
   
   //check if clicking on slider thumb or track (with larger hit area)
-  if (mouseY >= brushSizeSliderY - thumbRadius - 5 && mouseY <= brushSizeSliderY + thumbRadius + 5 &&
-      mouseX >= brushSizeSliderX - thumbRadius && mouseX <= brushSizeSliderX + brushSizeSliderWidth + thumbRadius) {
+  if (uiMouseY >= brushSizeSliderY - thumbRadius - 5 && uiMouseY <= brushSizeSliderY + thumbRadius + 5 &&
+      uiMouseX >= brushSizeSliderX - thumbRadius && uiMouseX <= brushSizeSliderX + brushSizeSliderWidth + thumbRadius) {
     draggingSlider = true;
     updateBrushSizeFromSlider();
     return; //don't start drawing if adjusting slider
@@ -651,26 +689,27 @@ function mousePressed(){
   let totalRightButtonsHeight = rightBtnHeight * 2 + buttonSpacing;
   let buttonsCenterY = brushSizeSliderY - 30;
   let saveBtnY = buttonsCenterY - totalRightButtonsHeight / 2;
-  let saveBtnX = width - rightBtnWidth - 20;
+  let saveBtnX = BASE_WIDTH - rightBtnWidth - 20;
   
-  if (mouseX >= saveBtnX && mouseX <= saveBtnX + rightBtnWidth &&
-      mouseY >= saveBtnY && mouseY <= saveBtnY + rightBtnHeight) {
+  if (uiMouseX >= saveBtnX && uiMouseX <= saveBtnX + rightBtnWidth &&
+      uiMouseY >= saveBtnY && uiMouseY <= saveBtnY + rightBtnHeight) {
     saveCanvas(hidden_drawing, 'drawing', 'png');
     return;
   }
   
   let clearDrawBtnY = saveBtnY + rightBtnHeight + buttonSpacing;
-  if (mouseX >= saveBtnX && mouseX <= saveBtnX + rightBtnWidth &&
-      mouseY >= clearDrawBtnY && mouseY <= clearDrawBtnY + rightBtnHeight) {
+  if (uiMouseX >= saveBtnX && uiMouseX <= saveBtnX + rightBtnWidth &&
+      uiMouseY >= clearDrawBtnY && uiMouseY <= clearDrawBtnY + rightBtnHeight) {
     hidden_drawing.background('white');
     return;
   }
   
   //don't start drawing if clicking in instruction area (but allow slider area)
-  if (mouseY < 120) return;
+  if (uiMouseY < 120) return;
   
-  X=mouseX; //x position
-  Y=mouseY; //y position
+  //convert screen coordinates to drawing coordinates
+  X = getDrawingX(mouseX); //x position
+  Y = getDrawingY(mouseY); //y position
 }
 
 //function called when mouse is dragged while being pressed 
@@ -698,12 +737,16 @@ function mouseDragged(){
   }
   
   //don't draw if in instruction area (but allow slider dragging)
-  if ((mouseY < 120 || Y < 120) && !draggingSlider) return;
+  if ((mouseY < 120 * canvasScale || Y < 120) && !draggingSlider) return;
+  
+  //convert current mouse position to drawing coordinates
+  let currentX = getDrawingX(mouseX);
+  let currentY = getDrawingY(mouseY);
   
   //draw based on brush type - all use same brushSize, different textures
   hidden_drawing.push();
-  let distVal = dist(X, Y, mouseX, mouseY);
-  let angle = atan2(mouseY - Y, mouseX - X);
+  let distVal = dist(X, Y, currentX, currentY);
+  let angle = atan2(currentY - Y, currentX - X);
   let speed = distVal / max(1, frameCount % 60); //approximate speed
   let steps = max(30, floor(distVal / 0.8));
   
@@ -722,8 +765,8 @@ function mouseDragged(){
       
       for (let i = 0; i <= steps * 4; i++) {
         let t = i / (steps * 4);
-        let px = lerp(X, mouseX, t);
-        let py = lerp(Y, mouseY, t);
+        let px = lerp(X, currentX, t);
+        let py = lerp(Y, currentY, t);
         
         //directional shading strokes
         let lineCount = 12;
@@ -770,8 +813,8 @@ function mouseDragged(){
     
     for (let i = 1; i <= steps; i++) {
       let t = i / steps;
-      let px = lerp(X, mouseX, t);
-      let py = lerp(Y, mouseY, t);
+      let px = lerp(X, currentX, t);
+      let py = lerp(Y, currentY, t);
       
       //smooth pressure curve with acceleration consideration
       let pressure = sin(t * PI);
@@ -814,8 +857,8 @@ function mouseDragged(){
     //draw particles with advanced flow simulation
     for (let i = 0; i <= steps * 6; i++) {
       let t = i / (steps * 6);
-      let baseX = lerp(X, mouseX, t);
-      let baseY = lerp(Y, mouseY, t);
+      let baseX = lerp(X, currentX, t);
+      let baseY = lerp(Y, currentY, t);
       
       //flow direction affects particle distribution
       let flowAngle = angle + (noise(baseX * 0.1, baseY * 0.1) - 0.5) * 0.5;
@@ -893,8 +936,8 @@ function mouseDragged(){
       
       for (let i = 1; i <= steps; i++) {
         let t = i / steps;
-        let baseX = lerp(X, mouseX, t);
-        let baseY = lerp(Y, mouseY, t);
+        let baseX = lerp(X, currentX, t);
+        let baseY = lerp(Y, currentY, t);
         
         //calculate velocity for paint flow simulation
         let velX = baseX - prevX;
@@ -955,8 +998,8 @@ function mouseDragged(){
   }
   
   hidden_drawing.pop();
-  X=mouseX; //x position
-  Y=mouseY; // y position
+  X = currentX; //x position
+  Y = currentY; // y position
 }
 
 //stop drawing function
@@ -968,19 +1011,52 @@ function mouseReleased(){
     selectionRect = {
       x1: selectStartX,
       y1: selectStartY,
-      x2: mouseX,
-      y2: mouseY
+      x2: getDrawingX(mouseX),
+      y2: getDrawingY(mouseY)
     };
     selectingRect = false;
   }
 }
 
 function updateBrushSizeFromSlider(){
+  //convert mouse to UI coordinates
+  let uiMouseX = mouseX / canvasScale;
   //constrain mouseX to slider bounds
-  let constrainedX = constrain(mouseX, brushSizeSliderX, brushSizeSliderX + brushSizeSliderWidth);
+  let constrainedX = constrain(uiMouseX, brushSizeSliderX, brushSizeSliderX + brushSizeSliderWidth);
   //map slider position to brush size
   brushSize = map(constrainedX, brushSizeSliderX, brushSizeSliderX + brushSizeSliderWidth, minBrushSize, maxBrushSize);
   brushSize = round(brushSize); //round to integer
+}
+
+//convert scaled canvas coordinates to actual drawing coordinates
+function getDrawingX(screenX) {
+  return screenX / canvasScale;
+}
+
+function getDrawingY(screenY) {
+  return screenY / canvasScale;
+}
+
+//convert drawing coordinates to scaled canvas coordinates
+function getScreenX(drawingX) {
+  return drawingX * canvasScale;
+}
+
+function getScreenY(drawingY) {
+  return drawingY * canvasScale;
+}
+
+//handle window resize for orientation changes on iPad
+function windowResized() {
+  //recalculate scale
+  let availableWidth = windowWidth - 100;
+  let availableHeight = windowHeight - 200;
+  let scaleX = availableWidth / BASE_WIDTH;
+  let scaleY = availableHeight / BASE_HEIGHT;
+  canvasScale = min(scaleX, scaleY, 1);
+  
+  //resize canvas
+  resizeCanvas(BASE_WIDTH * canvasScale, BASE_HEIGHT * canvasScale);
 }
 
 //touch support for iPad and mobile devices
