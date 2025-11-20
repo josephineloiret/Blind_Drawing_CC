@@ -982,3 +982,25 @@ function updateBrushSizeFromSlider(){
   brushSize = map(constrainedX, brushSizeSliderX, brushSizeSliderX + brushSizeSliderWidth, minBrushSize, maxBrushSize);
   brushSize = round(brushSize); //round to integer
 }
+
+//touch support for iPad and mobile devices
+function touchStarted(){
+  //call the same logic as mousePressed
+  mousePressed();
+  //prevent default behavior (like scrolling) when touching canvas
+  return false;
+}
+
+function touchMoved(){
+  //call the same logic as mouseDragged
+  mouseDragged();
+  //prevent default behavior (like scrolling) when dragging on canvas
+  return false;
+}
+
+function touchEnded(){
+  //call the same logic as mouseReleased
+  mouseReleased();
+  //prevent default behavior
+  return false;
+}
