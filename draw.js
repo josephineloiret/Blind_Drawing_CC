@@ -526,7 +526,7 @@ function drawInstructions(){
   let totalRightButtonsHeight = rightBtnHeight * 2 + buttonSpacing;
   let buttonsCenterY = brushSizeSliderY - 30;
   let saveBtnY = buttonsCenterY - totalRightButtonsHeight / 2;
-  let saveBtnX = width - rightBtnWidth - 20;
+  let saveBtnX = BASE_WIDTH - rightBtnWidth - 20;
   
   //Save button (top)
   fill(PERIWINKLE_R, PERIWINKLE_G, PERIWINKLE_B);
