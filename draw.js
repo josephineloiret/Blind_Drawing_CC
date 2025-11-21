@@ -1,17 +1,16 @@
-let hidden_drawing, X, Y, colorPickerBuffer, canvasScale = 1;
+let hidden_drawing, X, Y, colorPickerBuffer;
 let hidden = true, selectionMode = false, draggingSlider = false, selectingRect = false;
 let color = [0, 0, 0], selectionRect = null, selectStartX, selectStartY;
 let brushSize = 5, brushType = 'pencil', minBrushSize = 1, maxBrushSize = 50;
 const colorPickerX = 470, colorPickerY = 37, colorPickerWidth = 200, colorPickerHeight = 70;
 const brushSizeSliderX = 850, brushSizeSliderY = 95, brushSizeSliderWidth = 300, brushSizeSliderHeight = 4;
-const PERIWINKLE = [160, 160, 225], BASE_WIDTH = 1500, BASE_HEIGHT = 800;
+const PERIWINKLE = [160, 160, 225], CANVAS_WIDTH = 1500, CANVAS_HEIGHT = 800;
 
 function setup(){
-  canvasScale = min((windowWidth - 100) / BASE_WIDTH, (windowHeight - 200) / BASE_HEIGHT, 1);
-  let canvas = createCanvas(BASE_WIDTH * canvasScale, BASE_HEIGHT * canvasScale);
+  let canvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
   canvas.parent('canvas-container');
   
-  hidden_drawing = createGraphics(BASE_WIDTH, BASE_HEIGHT);
+  hidden_drawing = createGraphics(CANVAS_WIDTH, CANVAS_HEIGHT);
   hidden_drawing.background('white');
   hidden_drawing.stroke(0);
   hidden_drawing.strokeWeight(brushSize);
@@ -21,78 +20,62 @@ function setup(){
 }
 
 function draw(){
-  //gradient-like background
   background(20, 20, 30);
   
-  //show drawing or not
-  if (!hidden){ //if hidden is false, drawing will be shown fully
-    image(hidden_drawing, 0, 0, width, height);
+  if (!hidden){
+    image(hidden_drawing, 0, 0);
   } else {
-    //if hidden is true, show black overlay
     if (selectionRect === null) {
-      //no selection - hide entire drawing
-      fill(0, 0, 0);
+      fill(0);
       noStroke();
       rect(0, 0, width, height);
     } else {
-      //selection exists - show black overlay with only selected area visible
       push();
-      //draw black overlay covering entire canvas
-      fill(0, 0, 0);
+      fill(0);
       noStroke();
       rect(0, 0, width, height);
       
-      //use clip to show only the selected rectangle area
       drawingContext.save();
       drawingContext.beginPath();
-      let x1 = min(selectionRect.x1, selectionRect.x2) * canvasScale;
-      let y1 = min(selectionRect.y1, selectionRect.y2) * canvasScale;
-      let x2 = max(selectionRect.x1, selectionRect.x2) * canvasScale;
-      let y2 = max(selectionRect.y1, selectionRect.y2) * canvasScale;
+      let x1 = min(selectionRect.x1, selectionRect.x2);
+      let y1 = min(selectionRect.y1, selectionRect.y2);
+      let x2 = max(selectionRect.x1, selectionRect.x2);
+      let y2 = max(selectionRect.y1, selectionRect.y2);
       drawingContext.rect(x1, y1, x2 - x1, y2 - y1);
       drawingContext.clip();
-      //show drawing in clipped area
-      image(hidden_drawing, 0, 0, width, height);
+      image(hidden_drawing, 0, 0);
       drawingContext.restore();
       pop();
     }
   }
   
-  //draw selection rectangle outline if in selection mode
   if (selectionMode) {
     if (selectingRect) {
-      //show rectangle being dragged
       push();
       noFill();
-      stroke(255, 255, 0); //yellow outline
+      stroke(255, 255, 0);
       strokeWeight(2);
-      let currentDrawingX = getDrawingX(mouseX);
-      let currentDrawingY = getDrawingY(mouseY);
-      let x1 = min(selectStartX, currentDrawingX) * canvasScale;
-      let y1 = min(selectStartY, currentDrawingY) * canvasScale;
-      let x2 = max(selectStartX, currentDrawingX) * canvasScale;
-      let y2 = max(selectStartY, currentDrawingY) * canvasScale;
+      let x1 = min(selectStartX, mouseX);
+      let y1 = min(selectStartY, mouseY);
+      let x2 = max(selectStartX, mouseX);
+      let y2 = max(selectStartY, mouseY);
       rect(x1, y1, x2 - x1, y2 - y1);
       pop();
     } else if (selectionRect !== null) {
-      //show current selection rectangle
       push();
       noFill();
-      stroke(255, 255, 255); //white outline
+      stroke(255, 255, 255);
       strokeWeight(2);
-      let x1 = min(selectionRect.x1, selectionRect.x2) * canvasScale;
-      let y1 = min(selectionRect.y1, selectionRect.y2) * canvasScale;
-      let x2 = max(selectionRect.x1, selectionRect.x2) * canvasScale;
-      let y2 = max(selectionRect.y2, selectionRect.y2) * canvasScale;
+      let x1 = min(selectionRect.x1, selectionRect.x2);
+      let y1 = min(selectionRect.y1, selectionRect.y2);
+      let x2 = max(selectionRect.x1, selectionRect.x2);
+      let y2 = max(selectionRect.y2, selectionRect.y2);
       rect(x1, y1, x2 - x1, y2 - y1);
       pop();
     }
   }
   
-  //draw instructions panel with rounded background (on top)
   drawInstructions();
-  
-  //draw color picker (on top)
   drawColorPicker();
 }
 
@@ -150,35 +133,18 @@ function rgbToHsv(r, g, b) {
 }
 
 function drawColorPicker(){
-  push();
-  scale(canvasScale);
-  
-  //draw cached color picker (no separate background - uses main panel background)
   image(colorPickerBuffer, colorPickerX, colorPickerY);
   
-  //calculate position of current color on picker
   let hsv = rgbToHsv(color[0], color[1], color[2]);
-  let hue = hsv[0];
-  let bright = hsv[2]; //use brightness/value
+  let hue = hsv[0], bright = hsv[2];
   
-  //map hue to x position (0-360 to 0-width)
-  let selectorX = map(hue, 0, 360, colorPickerX, colorPickerX + colorPickerWidth);
-  //map brightness to y position (100% at top, 0% at bottom)
-  let selectorY = map(bright, 100, 0, colorPickerY, colorPickerY + colorPickerHeight);
+  let selectorX = constrain(map(hue, 0, 360, colorPickerX, colorPickerX + colorPickerWidth), colorPickerX, colorPickerX + colorPickerWidth);
+  let selectorY = constrain(map(bright, 100, 0, colorPickerY, colorPickerY + colorPickerHeight), colorPickerY, colorPickerY + colorPickerHeight);
   
-  //clamp to picker bounds
-  selectorX = constrain(selectorX, colorPickerX, colorPickerX + colorPickerWidth);
-  selectorY = constrain(selectorY, colorPickerY, colorPickerY + colorPickerHeight);
-  
-  //draw current color indicator at calculated position
-  //use white stroke for dark colors, black for light colors
-  let isDark = bright < 50;
   fill(color[0], color[1], color[2]);
-  stroke(isDark ? 255 : 0);
+  stroke(bright < 50 ? 255 : 0);
   strokeWeight(2);
   circle(selectorX, selectorY, 10);
-  
-  pop();
 }
 
 function hsvToRgb(h, s, v) {
@@ -207,22 +173,17 @@ function hsvToRgb(h, s, v) {
 }
 
 function getColorFromPicker(mx, my) {
-  let baseX = mx / canvasScale, baseY = my / canvasScale;
-  if (baseX < colorPickerX || baseX > colorPickerX + colorPickerWidth ||
-      baseY < colorPickerY || baseY > colorPickerY + colorPickerHeight) return null;
-  let hue = map(baseX, colorPickerX, colorPickerX + colorPickerWidth, 0, 360);
-  let bright = map(baseY, colorPickerY, colorPickerY + colorPickerHeight, 100, 0);
+  if (mx < colorPickerX || mx > colorPickerX + colorPickerWidth ||
+      my < colorPickerY || my > colorPickerY + colorPickerHeight) return null;
+  let hue = map(mx, colorPickerX, colorPickerX + colorPickerWidth, 0, 360);
+  let bright = map(my, colorPickerY, colorPickerY + colorPickerHeight, 100, 0);
   return hsvToRgb(hue, getSat(bright), bright);
 }
 
 function drawInstructions(){
-  push();
-  scale(canvasScale);
-  
-  //draw clean panel background - reduced height since no title
   fill(255, 255, 255, 250);
   noStroke();
-  rect(0, 0, BASE_WIDTH, 120);
+  rect(0, 0, CANVAS_WIDTH, 120);
   
   let buttonSpacing = 12, leftBtnWidth = 170, leftBtnHeight = 38;
   let leftBtnX = 20, selectModeBtnY = 60 - (leftBtnHeight * 2 + buttonSpacing) / 2;
@@ -404,12 +365,10 @@ function drawInstructions(){
   
   let rightBtnWidth = 170, rightBtnHeight = 38;
   let saveBtnY = (brushSizeSliderY - 30) - (rightBtnHeight * 2 + buttonSpacing) / 2;
-  let saveBtnX = BASE_WIDTH - rightBtnWidth - 20;
+  let saveBtnX = CANVAS_WIDTH - rightBtnWidth - 20;
   
   drawButton(saveBtnX, saveBtnY, rightBtnWidth, rightBtnHeight, 'Save');
   drawButton(saveBtnX, saveBtnY + rightBtnHeight + buttonSpacing, rightBtnWidth, rightBtnHeight, 'Clear Drawing');
-  
-  pop();
 }
 
 function drawBrushSizeSlider(){
@@ -450,32 +409,31 @@ function drawBrushSizeSlider(){
 }
 
 function mousePressed(){
-  let uiMouseX = mouseX / canvasScale, uiMouseY = mouseY / canvasScale;
   let buttonSpacing = 12, leftBtnWidth = 170, leftBtnHeight = 38;
   let leftBtnX = 20, selectModeBtnY = 60 - (leftBtnHeight * 2 + buttonSpacing) / 2;
   let revealBtnY = selectModeBtnY + leftBtnHeight + buttonSpacing;
   
-  if (inBounds(uiMouseX, uiMouseY, leftBtnX, selectModeBtnY, leftBtnWidth, leftBtnHeight)) {
+  if (inBounds(mouseX, mouseY, leftBtnX, selectModeBtnY, leftBtnWidth, leftBtnHeight)) {
     selectionMode = !selectionMode;
     selectingRect = false;
     return;
   }
   
-  if (inBounds(uiMouseX, uiMouseY, leftBtnX, revealBtnY, leftBtnWidth, leftBtnHeight)) {
+  if (inBounds(mouseX, mouseY, leftBtnX, revealBtnY, leftBtnWidth, leftBtnHeight)) {
     hidden = !hidden;
     return;
   }
   
-  if (selectionRect !== null && inBounds(uiMouseX, uiMouseY, leftBtnX + leftBtnWidth + buttonSpacing, revealBtnY, 140, leftBtnHeight)) {
+  if (selectionRect !== null && inBounds(mouseX, mouseY, leftBtnX + leftBtnWidth + buttonSpacing, revealBtnY, 140, leftBtnHeight)) {
     selectionRect = null;
     return;
   }
   
   if (selectionMode) {
-    if (uiMouseY >= 120) {
+    if (mouseY >= 120) {
       selectingRect = true;
-      selectStartX = getDrawingX(mouseX);
-      selectStartY = getDrawingY(mouseY);
+      selectStartX = mouseX;
+      selectStartY = mouseY;
     }
     return;
   }
@@ -486,9 +444,9 @@ function mousePressed(){
   let brushTypes = ['pencil', 'pen', 'watercolor', 'paintbrush'];
   let brushX = 850, brushY = 37, brushBtnWidth = 70, brushBtnHeight = 30, brushSpacing = 8;
   
-  if (uiMouseY >= brushY && uiMouseY <= brushY + brushBtnHeight + 20) {
+  if (mouseY >= brushY && mouseY <= brushY + brushBtnHeight + 20) {
     for (let i = 0; i < brushTypes.length; i++) {
-      if (inBounds(uiMouseX, uiMouseY, brushX + i * (brushBtnWidth + brushSpacing), brushY, brushBtnWidth, brushBtnHeight)) {
+      if (inBounds(mouseX, mouseY, brushX + i * (brushBtnWidth + brushSpacing), brushY, brushBtnWidth, brushBtnHeight)) {
         brushType = brushTypes[i];
         return;
       }
@@ -496,7 +454,7 @@ function mousePressed(){
   }
   
   let thumbRadius = 8;
-  if (inBounds(uiMouseX, uiMouseY, brushSizeSliderX - thumbRadius, brushSizeSliderY - thumbRadius - 5, 
+  if (inBounds(mouseX, mouseY, brushSizeSliderX - thumbRadius, brushSizeSliderY - thumbRadius - 5, 
       brushSizeSliderWidth + thumbRadius * 2, thumbRadius * 2 + 10)) {
     draggingSlider = true;
     updateBrushSizeFromSlider();
@@ -505,21 +463,21 @@ function mousePressed(){
   
   let rightBtnWidth = 170, rightBtnHeight = 38;
   let saveBtnY = (brushSizeSliderY - 30) - (rightBtnHeight * 2 + buttonSpacing) / 2;
-  let saveBtnX = BASE_WIDTH - rightBtnWidth - 20;
+  let saveBtnX = CANVAS_WIDTH - rightBtnWidth - 20;
   
-  if (inBounds(uiMouseX, uiMouseY, saveBtnX, saveBtnY, rightBtnWidth, rightBtnHeight)) {
+  if (inBounds(mouseX, mouseY, saveBtnX, saveBtnY, rightBtnWidth, rightBtnHeight)) {
     saveCanvas(hidden_drawing, 'drawing', 'png');
     return;
   }
   
-  if (inBounds(uiMouseX, uiMouseY, saveBtnX, saveBtnY + rightBtnHeight + buttonSpacing, rightBtnWidth, rightBtnHeight)) {
+  if (inBounds(mouseX, mouseY, saveBtnX, saveBtnY + rightBtnHeight + buttonSpacing, rightBtnWidth, rightBtnHeight)) {
     hidden_drawing.background('white');
     return;
   }
   
-  if (uiMouseY < 120) return;
-  X = getDrawingX(mouseX);
-  Y = getDrawingY(mouseY);
+  if (mouseY < 120) return;
+  X = mouseX;
+  Y = mouseY;
 }
 
 function mouseDragged(){
@@ -531,11 +489,10 @@ function mouseDragged(){
   let newColor = getColorFromPicker(mouseX, mouseY);
   if (newColor !== null) { color = newColor; return; }
   
-  if ((mouseY < 120 * canvasScale || Y < 120) && !draggingSlider) return;
+  if (mouseY < 120 || Y < 120) return;
   
-  //convert current mouse position to drawing coordinates
-  let currentX = getDrawingX(mouseX);
-  let currentY = getDrawingY(mouseY);
+  let currentX = mouseX;
+  let currentY = mouseY;
   
   //draw based on brush type - all use same brushSize, different textures
   hidden_drawing.push();
@@ -799,25 +756,14 @@ function mouseDragged(){
 function mouseReleased(){
   draggingSlider = false;
   if (selectingRect) {
-    selectionRect = { x1: selectStartX, y1: selectStartY, x2: getDrawingX(mouseX), y2: getDrawingY(mouseY) };
+    selectionRect = { x1: selectStartX, y1: selectStartY, x2: mouseX, y2: mouseY };
     selectingRect = false;
   }
 }
 
 function updateBrushSizeFromSlider(){
-  let uiMouseX = mouseX / canvasScale;
-  let constrainedX = constrain(uiMouseX, brushSizeSliderX, brushSizeSliderX + brushSizeSliderWidth);
+  let constrainedX = constrain(mouseX, brushSizeSliderX, brushSizeSliderX + brushSizeSliderWidth);
   brushSize = round(map(constrainedX, brushSizeSliderX, brushSizeSliderX + brushSizeSliderWidth, minBrushSize, maxBrushSize));
-}
-
-function getDrawingX(screenX) { return screenX / canvasScale; }
-function getDrawingY(screenY) { return screenY / canvasScale; }
-function getScreenX(drawingX) { return drawingX * canvasScale; }
-function getScreenY(drawingY) { return drawingY * canvasScale; }
-
-function windowResized() {
-  canvasScale = min((windowWidth - 100) / BASE_WIDTH, (windowHeight - 200) / BASE_HEIGHT, 1);
-  resizeCanvas(BASE_WIDTH * canvasScale, BASE_HEIGHT * canvasScale);
 }
 
 function touchStarted() { mousePressed(); return false; }
