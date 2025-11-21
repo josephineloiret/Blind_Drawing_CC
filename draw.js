@@ -1,58 +1,21 @@
-let hidden_drawing; 
-let hidden=true;
-let X;
-let Y;
-let color = [0, 0, 0]; //color array
-let colorPickerX = 470; //x position of color box
-let colorPickerY = 37; //y position of color box
-let colorPickerWidth = 200;
-let colorPickerHeight = 70; //reduced to fit in panel
-let colorPickerBuffer;
-let brushSize = 5; //brush size
-let brushType = 'pencil'; //brush type: 'pencil', 'pen', 'watercolor', 'paintbrush'
-let brushSizeSliderX = 850; //slider position
-let brushSizeSliderY = 95; //slider position (below brush buttons on second row)
-let brushSizeSliderWidth = 300; //slider track width
-let brushSizeSliderHeight = 4; //slider track height
-let minBrushSize = 1;
-let maxBrushSize = 50;
-let draggingSlider = false;
-let selectionMode = false; //true when in selection mode
-let selectionRect = null; //{x1, y1, x2, y2} or null if no selection
-let selectingRect = false; //true when dragging to create selection
-let selectStartX, selectStartY; //start position of selection drag
-//periwinkle blue color constants
-const PERIWINKLE_R = 160;
-const PERIWINKLE_G = 160;
-const PERIWINKLE_B = 225;
-//responsive canvas sizing
-const BASE_WIDTH = 1500;
-const BASE_HEIGHT = 800;
-let canvasScale = 1;
+let hidden_drawing, X, Y, colorPickerBuffer, canvasScale = 1;
+let hidden = true, selectionMode = false, draggingSlider = false, selectingRect = false;
+let color = [0, 0, 0], selectionRect = null, selectStartX, selectStartY;
+let brushSize = 5, brushType = 'pencil', minBrushSize = 1, maxBrushSize = 50;
+const colorPickerX = 470, colorPickerY = 37, colorPickerWidth = 200, colorPickerHeight = 70;
+const brushSizeSliderX = 850, brushSizeSliderY = 95, brushSizeSliderWidth = 300, brushSizeSliderHeight = 4;
+const PERIWINKLE = [160, 160, 225], BASE_WIDTH = 1500, BASE_HEIGHT = 800;
 
 function setup(){
-  //calculate canvas size to fit viewport
-  let availableWidth = windowWidth - 100; //leave some margin
-  let availableHeight = windowHeight - 200; //leave room for title/subtitle and margins
-  
-  //calculate scale to fit base dimensions within available space
-  let scaleX = availableWidth / BASE_WIDTH;
-  let scaleY = availableHeight / BASE_HEIGHT;
-  canvasScale = min(scaleX, scaleY, 1); //never scale up, only down
-  
-  //create canvas with scaled dimensions
-  let canvasWidth = BASE_WIDTH * canvasScale;
-  let canvasHeight = BASE_HEIGHT * canvasScale;
-  let canvas = createCanvas(canvasWidth, canvasHeight);
+  canvasScale = min((windowWidth - 100) / BASE_WIDTH, (windowHeight - 200) / BASE_HEIGHT, 1);
+  let canvas = createCanvas(BASE_WIDTH * canvasScale, BASE_HEIGHT * canvasScale);
   canvas.parent('canvas-container');
   
-  //hidden drawing uses base dimensions for quality
-  hidden_drawing=createGraphics(BASE_WIDTH, BASE_HEIGHT);
-  hidden_drawing.background('white'); //drawing background
-  hidden_drawing.stroke(0); //drawing color
-  hidden_drawing.strokeWeight(brushSize); //thickness of drawing
+  hidden_drawing = createGraphics(BASE_WIDTH, BASE_HEIGHT);
+  hidden_drawing.background('white');
+  hidden_drawing.stroke(0);
+  hidden_drawing.strokeWeight(brushSize);
   
-  //create color picker buffer
   colorPickerBuffer = createGraphics(colorPickerWidth, colorPickerHeight);
   drawColorPickerToBuffer();
 }
@@ -133,40 +96,39 @@ function draw(){
   drawColorPicker();
 }
 
+function getSat(bright) {
+  return bright >= 60 ? map(bright, 100, 60, 0, 100) : bright <= 10 ? map(bright, 10, 0, 100, 0) : 100;
+}
+
+function inBounds(mx, my, x, y, w, h) {
+  return mx >= x && mx <= x + w && my >= y && my <= y + h;
+}
+
+function drawButton(x, y, w, h, label, isActive = false) {
+  let clr = isActive ? [45, 55, 72] : PERIWINKLE;
+  fill(clr[0], clr[1], clr[2]);
+  stroke(clr[0], clr[1], clr[2]);
+  strokeWeight(1);
+  rect(x, y, w, h, 3);
+  fill(255);
+  textSize(13);
+  textStyle(NORMAL);
+  textAlign(CENTER);
+  text(label, x + w/2, y + 25);
+  textAlign(LEFT);
+}
+
 function drawColorPickerToBuffer(){
-  //draw rectangular color picker
-  //X axis = Hue (0-360), Y axis = Brightness (100% white at top, 0% black at bottom)
-  //Saturation varies: 0% at top (white), 100% in middle, then back down as brightness decreases
   for (let x = 0; x < colorPickerWidth; x += 2) {
     for (let y = 0; y < colorPickerHeight; y += 2) {
-      //calculate hue based on x position (0 to 360 degrees)
       let hue = map(x, 0, colorPickerWidth, 0, 360);
-      //calculate brightness/value based on y position (100% at top, 0% at bottom)
       let bright = map(y, 0, colorPickerHeight, 100, 0);
-      
-      //calculate saturation: 0% at very top (white), 100% in upper-middle, then decrease as we approach black
-      let sat;
-      if (bright >= 60) {
-        //top area: transition from white (sat=0) to full color (sat=100) - larger transition zone
-        sat = map(bright, 100, 60, 0, 100);
-      } else if (bright <= 10) {
-        //bottom area: transition from full color to black (sat decreases)
-        sat = map(bright, 10, 0, 100, 0);
-      } else {
-        //middle area: full saturation
-        sat = 100;
-      }
-      
-      //convert HSV to RGB
-      let rgb = hsvToRgb(hue, sat, bright);
-      
+      let rgb = hsvToRgb(hue, getSat(bright), bright);
       colorPickerBuffer.fill(rgb[0], rgb[1], rgb[2]);
       colorPickerBuffer.noStroke();
       colorPickerBuffer.rect(x, y, 2, 2);
     }
   }
-  
-  //draw border
   colorPickerBuffer.stroke(200);
   colorPickerBuffer.strokeWeight(2);
   colorPickerBuffer.noFill();
@@ -174,33 +136,17 @@ function drawColorPickerToBuffer(){
 }
 
 function rgbToHsv(r, g, b) {
-  r = r / 255;
-  g = g / 255;
-  b = b / 255;
-  
-  let max = Math.max(r, g, b);
-  let min = Math.min(r, g, b);
-  let delta = max - min;
-  
+  r /= 255; g /= 255; b /= 255;
+  let max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min;
   let h = 0;
   if (delta !== 0) {
-    if (max === r) {
-      h = ((g - b) / delta);
-      if (h < 0) h += 6;
-    } else if (max === g) {
-      h = (b - r) / delta + 2;
-    } else {
-      h = (r - g) / delta + 4;
-    }
+    if (max === r) h = ((g - b) / delta) + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / delta + 2;
+    else h = (r - g) / delta + 4;
   }
-  h = Math.round(h * 60);
+  h = Math.round(h * 60) % 360;
   if (h < 0) h += 360;
-  if (h >= 360) h -= 360;
-  
-  let s = max === 0 ? 0 : Math.round((delta / max) * 100);
-  let v = Math.round(max * 100);
-  
-  return [h, s, v];
+  return [h, max === 0 ? 0 : Math.round((delta / max) * 100), Math.round(max * 100)];
 }
 
 function drawColorPicker(){
@@ -261,36 +207,12 @@ function hsvToRgb(h, s, v) {
 }
 
 function getColorFromPicker(mx, my) {
-  //convert screen coordinates to base UI coordinates
-  let baseX = mx / canvasScale;
-  let baseY = my / canvasScale;
-  
-  //check if click is within color picker bounds
+  let baseX = mx / canvasScale, baseY = my / canvasScale;
   if (baseX < colorPickerX || baseX > colorPickerX + colorPickerWidth ||
-      baseY < colorPickerY || baseY > colorPickerY + colorPickerHeight) {
-    return null;
-  }
-  
-  //calculate hue based on x position (0 to 360 degrees)
+      baseY < colorPickerY || baseY > colorPickerY + colorPickerHeight) return null;
   let hue = map(baseX, colorPickerX, colorPickerX + colorPickerWidth, 0, 360);
-  //calculate brightness/value based on y position (100% at top, 0% at bottom)
   let bright = map(baseY, colorPickerY, colorPickerY + colorPickerHeight, 100, 0);
-  
-  //calculate saturation: 0% at very top (white), 100% in upper-middle, then decrease as we approach black
-  let sat;
-  if (bright >= 60) {
-    //top area: transition from white (sat=0) to full color (sat=100) - larger transition zone
-    sat = map(bright, 100, 60, 0, 100);
-  } else if (bright <= 10) {
-    //bottom area: transition from full color to black (sat decreases)
-    sat = map(bright, 10, 0, 100, 0);
-  } else {
-    //middle area: full saturation
-    sat = 100;
-  }
-  
-  //convert to RGB
-  return hsvToRgb(hue, sat, bright);
+  return hsvToRgb(hue, getSat(bright), bright);
 }
 
 function drawInstructions(){
@@ -302,55 +224,15 @@ function drawInstructions(){
   noStroke();
   rect(0, 0, BASE_WIDTH, 120);
   
-  //left side buttons - before color (stacked vertically)
-  let buttonSpacing = 12; //consistent spacing between buttons
-  
-  //calculate centered position for stacked buttons - bigger size
-  let leftBtnWidth = 170;
-  let leftBtnHeight = 38;
-  let totalLeftButtonsHeight = leftBtnHeight * 2 + buttonSpacing;
-  let leftButtonsCenterY = 60;
-  let leftBtnX = 20;
-  
-  //Selection Mode toggle button (top)
-  let selectModeBtnY = leftButtonsCenterY - totalLeftButtonsHeight / 2;
-  fill(selectionMode ? 45 : PERIWINKLE_R, selectionMode ? 55 : PERIWINKLE_G, selectionMode ? 72 : PERIWINKLE_B);
-  stroke(selectionMode ? 45 : PERIWINKLE_R, selectionMode ? 55 : PERIWINKLE_G, selectionMode ? 72 : PERIWINKLE_B);
-  strokeWeight(1);
-  rect(leftBtnX, selectModeBtnY, leftBtnWidth, leftBtnHeight, 3);
-  fill(255);
-  textSize(13);
-  textStyle(NORMAL);
-  textAlign(CENTER);
-  text(selectionMode ? 'Drawing Mode' : 'Selection Mode', leftBtnX + leftBtnWidth/2, selectModeBtnY + 25);
-  textAlign(LEFT);
-  
-  //Reveal/Hide button (below Selection Mode)
+  let buttonSpacing = 12, leftBtnWidth = 170, leftBtnHeight = 38;
+  let leftBtnX = 20, selectModeBtnY = 60 - (leftBtnHeight * 2 + buttonSpacing) / 2;
   let revealBtnY = selectModeBtnY + leftBtnHeight + buttonSpacing;
-  fill(hidden ? PERIWINKLE_R : 45, hidden ? PERIWINKLE_G : 55, hidden ? PERIWINKLE_B : 72);
-  stroke(hidden ? PERIWINKLE_R : 45, hidden ? PERIWINKLE_G : 55, hidden ? PERIWINKLE_B : 72);
-  strokeWeight(1);
-  rect(leftBtnX, revealBtnY, leftBtnWidth, leftBtnHeight, 3);
-  fill(255);
-  textSize(13);
-  textStyle(NORMAL);
-  textAlign(CENTER);
-  text(hidden ? 'Reveal' : 'Hide', leftBtnX + leftBtnWidth/2, revealBtnY + 25);
-  textAlign(LEFT);
   
-  //Clear Selection button (only show if there's a selection)
+  drawButton(leftBtnX, selectModeBtnY, leftBtnWidth, leftBtnHeight, selectionMode ? 'Drawing Mode' : 'Selection Mode', selectionMode);
+  drawButton(leftBtnX, revealBtnY, leftBtnWidth, leftBtnHeight, hidden ? 'Reveal' : 'Hide', !hidden);
+  
   if (selectionRect !== null) {
-    let clearSelBtnX = leftBtnX + leftBtnWidth + buttonSpacing;
-    fill(PERIWINKLE_R, PERIWINKLE_G, PERIWINKLE_B);
-    stroke(PERIWINKLE_R, PERIWINKLE_G, PERIWINKLE_B);
-    strokeWeight(1);
-    rect(clearSelBtnX, revealBtnY, 140, leftBtnHeight, 3);
-    fill(255);
-    textSize(13);
-    textStyle(NORMAL);
-    textAlign(CENTER);
-    text('Clear Selection', clearSelBtnX + 70, revealBtnY + 25);
-    textAlign(LEFT);
+    drawButton(leftBtnX + leftBtnWidth + buttonSpacing, revealBtnY, 140, leftBtnHeight, 'Clear Selection');
   }
   
   //color section - with better spacing from left buttons
@@ -520,38 +402,12 @@ function drawInstructions(){
   //draw brush size slider
   drawBrushSizeSlider();
   
-  //right side buttons - after brushes (stacked vertically, centered)
-  let rightBtnWidth = 170;
-  let rightBtnHeight = 38;
-  let totalRightButtonsHeight = rightBtnHeight * 2 + buttonSpacing;
-  let buttonsCenterY = brushSizeSliderY - 30;
-  let saveBtnY = buttonsCenterY - totalRightButtonsHeight / 2;
+  let rightBtnWidth = 170, rightBtnHeight = 38;
+  let saveBtnY = (brushSizeSliderY - 30) - (rightBtnHeight * 2 + buttonSpacing) / 2;
   let saveBtnX = BASE_WIDTH - rightBtnWidth - 20;
   
-  //Save button (top)
-  fill(PERIWINKLE_R, PERIWINKLE_G, PERIWINKLE_B);
-  stroke(PERIWINKLE_R, PERIWINKLE_G, PERIWINKLE_B);
-  strokeWeight(1);
-  rect(saveBtnX, saveBtnY, rightBtnWidth, rightBtnHeight, 3);
-  fill(255);
-  textSize(13);
-  textStyle(NORMAL);
-  textAlign(CENTER);
-  text('Save', saveBtnX + rightBtnWidth/2, saveBtnY + 25);
-  textAlign(LEFT);
-  
-  //Clear Drawing button (below Save)
-  let clearDrawBtnY = saveBtnY + rightBtnHeight + buttonSpacing;
-  fill(PERIWINKLE_R, PERIWINKLE_G, PERIWINKLE_B);
-  stroke(PERIWINKLE_R, PERIWINKLE_G, PERIWINKLE_B);
-  strokeWeight(1);
-  rect(saveBtnX, clearDrawBtnY, rightBtnWidth, rightBtnHeight, 3);
-  fill(255);
-  textSize(13);
-  textStyle(NORMAL);
-  textAlign(CENTER);
-  text('Clear Drawing', saveBtnX + rightBtnWidth/2, clearDrawBtnY + 25);
-  textAlign(LEFT);
+  drawButton(saveBtnX, saveBtnY, rightBtnWidth, rightBtnHeight, 'Save');
+  drawButton(saveBtnX, saveBtnY + rightBtnHeight + buttonSpacing, rightBtnWidth, rightBtnHeight, 'Clear Drawing');
   
   pop();
 }
@@ -593,150 +449,88 @@ function drawBrushSizeSlider(){
   pop();
 }
 
-//start drawing function
 function mousePressed(){
-  //convert mouse coordinates to base UI coordinates for UI checks
-  let uiMouseX = mouseX / canvasScale;
-  let uiMouseY = mouseY / canvasScale;
+  let uiMouseX = mouseX / canvasScale, uiMouseY = mouseY / canvasScale;
+  let buttonSpacing = 12, leftBtnWidth = 170, leftBtnHeight = 38;
+  let leftBtnX = 20, selectModeBtnY = 60 - (leftBtnHeight * 2 + buttonSpacing) / 2;
+  let revealBtnY = selectModeBtnY + leftBtnHeight + buttonSpacing;
   
-  //check if clicking on selection mode button (left side - top, stacked)
-  let buttonSpacing = 12;
-  let leftBtnWidth = 170;
-  let leftBtnHeight = 38;
-  let totalLeftButtonsHeight = leftBtnHeight * 2 + buttonSpacing;
-  let leftButtonsCenterY = 60;
-  let leftBtnX = 20;
-  
-  let selectModeBtnY = leftButtonsCenterY - totalLeftButtonsHeight / 2;
-  if (uiMouseX >= leftBtnX && uiMouseX <= leftBtnX + leftBtnWidth &&
-      uiMouseY >= selectModeBtnY && uiMouseY <= selectModeBtnY + leftBtnHeight) {
+  if (inBounds(uiMouseX, uiMouseY, leftBtnX, selectModeBtnY, leftBtnWidth, leftBtnHeight)) {
     selectionMode = !selectionMode;
     selectingRect = false;
     return;
   }
   
-  //check if clicking on Reveal/Hide button (left side - below Selection Mode)
-  let revealBtnY = selectModeBtnY + leftBtnHeight + buttonSpacing;
-  if (uiMouseX >= leftBtnX && uiMouseX <= leftBtnX + leftBtnWidth &&
-      uiMouseY >= revealBtnY && uiMouseY <= revealBtnY + leftBtnHeight) {
+  if (inBounds(uiMouseX, uiMouseY, leftBtnX, revealBtnY, leftBtnWidth, leftBtnHeight)) {
     hidden = !hidden;
     return;
   }
   
-  //check if clicking on clear selection button
-  if (selectionRect !== null) {
-    let clearSelBtnX = leftBtnX + leftBtnWidth + buttonSpacing;
-    if (uiMouseX >= clearSelBtnX && uiMouseX <= clearSelBtnX + 140 &&
-        uiMouseY >= revealBtnY && uiMouseY <= revealBtnY + leftBtnHeight) {
-      selectionRect = null;
-      return;
-    }
+  if (selectionRect !== null && inBounds(uiMouseX, uiMouseY, leftBtnX + leftBtnWidth + buttonSpacing, revealBtnY, 140, leftBtnHeight)) {
+    selectionRect = null;
+    return;
   }
   
-  //if in selection mode, start creating selection rectangle
   if (selectionMode) {
-    //don't start selection if clicking in UI area
-    if (uiMouseY < 120) return;
-    
-    selectingRect = true;
-    selectStartX = getDrawingX(mouseX);
-    selectStartY = getDrawingY(mouseY);
-    return; //don't draw when in selection mode
+    if (uiMouseY >= 120) {
+      selectingRect = true;
+      selectStartX = getDrawingX(mouseX);
+      selectStartY = getDrawingY(mouseY);
+    }
+    return;
   }
   
-  //check if clicking on color picker
   let newColor = getColorFromPicker(mouseX, mouseY);
-  if (newColor !== null) {
-    color = newColor;
-    return; //don't start drawing if selecting color
-  }
+  if (newColor !== null) { color = newColor; return; }
   
-  //check if clicking on brush type buttons
   let brushTypes = ['pencil', 'pen', 'watercolor', 'paintbrush'];
-  let brushX = 850;
-  let brushY = 37;
-  let brushBtnWidth = 70;
-  let brushBtnHeight = 30;
-  let brushSpacing = 8; //increased spacing
+  let brushX = 850, brushY = 37, brushBtnWidth = 70, brushBtnHeight = 30, brushSpacing = 8;
   
   if (uiMouseY >= brushY && uiMouseY <= brushY + brushBtnHeight + 20) {
     for (let i = 0; i < brushTypes.length; i++) {
-      let btnX = brushX + i * (brushBtnWidth + brushSpacing);
-      if (uiMouseX >= btnX && uiMouseX <= btnX + brushBtnWidth) {
+      if (inBounds(uiMouseX, uiMouseY, brushX + i * (brushBtnWidth + brushSpacing), brushY, brushBtnWidth, brushBtnHeight)) {
         brushType = brushTypes[i];
-        return; //don't start drawing if selecting brush type
+        return;
       }
     }
   }
   
-  //check if clicking on brush size slider (check before instruction area check)
   let thumbRadius = 8;
-  let sliderValue = map(brushSize, minBrushSize, maxBrushSize, 0, brushSizeSliderWidth);
-  let thumbX = brushSizeSliderX + sliderValue;
-  let thumbY = brushSizeSliderY;
-  
-  //check if clicking on slider thumb or track (with larger hit area)
-  if (uiMouseY >= brushSizeSliderY - thumbRadius - 5 && uiMouseY <= brushSizeSliderY + thumbRadius + 5 &&
-      uiMouseX >= brushSizeSliderX - thumbRadius && uiMouseX <= brushSizeSliderX + brushSizeSliderWidth + thumbRadius) {
+  if (inBounds(uiMouseX, uiMouseY, brushSizeSliderX - thumbRadius, brushSizeSliderY - thumbRadius - 5, 
+      brushSizeSliderWidth + thumbRadius * 2, thumbRadius * 2 + 10)) {
     draggingSlider = true;
     updateBrushSizeFromSlider();
-    return; //don't start drawing if adjusting slider
+    return;
   }
   
-  //check if clicking on Save/Clear Drawing buttons (right side)
-  let rightBtnWidth = 170;
-  let rightBtnHeight = 38;
-  let totalRightButtonsHeight = rightBtnHeight * 2 + buttonSpacing;
-  let buttonsCenterY = brushSizeSliderY - 30;
-  let saveBtnY = buttonsCenterY - totalRightButtonsHeight / 2;
+  let rightBtnWidth = 170, rightBtnHeight = 38;
+  let saveBtnY = (brushSizeSliderY - 30) - (rightBtnHeight * 2 + buttonSpacing) / 2;
   let saveBtnX = BASE_WIDTH - rightBtnWidth - 20;
   
-  if (uiMouseX >= saveBtnX && uiMouseX <= saveBtnX + rightBtnWidth &&
-      uiMouseY >= saveBtnY && uiMouseY <= saveBtnY + rightBtnHeight) {
+  if (inBounds(uiMouseX, uiMouseY, saveBtnX, saveBtnY, rightBtnWidth, rightBtnHeight)) {
     saveCanvas(hidden_drawing, 'drawing', 'png');
     return;
   }
   
-  let clearDrawBtnY = saveBtnY + rightBtnHeight + buttonSpacing;
-  if (uiMouseX >= saveBtnX && uiMouseX <= saveBtnX + rightBtnWidth &&
-      uiMouseY >= clearDrawBtnY && uiMouseY <= clearDrawBtnY + rightBtnHeight) {
+  if (inBounds(uiMouseX, uiMouseY, saveBtnX, saveBtnY + rightBtnHeight + buttonSpacing, rightBtnWidth, rightBtnHeight)) {
     hidden_drawing.background('white');
     return;
   }
   
-  //don't start drawing if clicking in instruction area (but allow slider area)
   if (uiMouseY < 120) return;
-  
-  //convert screen coordinates to drawing coordinates
-  X = getDrawingX(mouseX); //x position
-  Y = getDrawingY(mouseY); //y position
+  X = getDrawingX(mouseX);
+  Y = getDrawingY(mouseY);
 }
 
-//function called when mouse is dragged while being pressed 
 function mouseDragged(){
-  //if in selection mode and dragging selection rectangle
-  if (selectionMode && selectingRect) {
-    //selection rectangle is updated in draw() function via mouseX/mouseY
-    return; //don't draw when selecting
-  }
-  
-  //don't draw if in selection mode
+  if (selectionMode && selectingRect) return;
   if (selectionMode) return;
   
-  //check if dragging brush size slider
-  if (draggingSlider) {
-    updateBrushSizeFromSlider();
-    return; //don't draw if adjusting slider
-  }
+  if (draggingSlider) { updateBrushSizeFromSlider(); return; }
   
-  //check if dragging on color picker
   let newColor = getColorFromPicker(mouseX, mouseY);
-  if (newColor !== null) {
-    color = newColor;
-    return; //don't draw if selecting color
-  }
+  if (newColor !== null) { color = newColor; return; }
   
-  //don't draw if in instruction area (but allow slider dragging)
   if ((mouseY < 120 * canvasScale || Y < 120) && !draggingSlider) return;
   
   //convert current mouse position to drawing coordinates
@@ -1002,81 +796,30 @@ function mouseDragged(){
   Y = currentY; // y position
 }
 
-//stop drawing function
 function mouseReleased(){
-  draggingSlider = false; //stop dragging slider
-  
-  //finish selection rectangle if we were selecting
+  draggingSlider = false;
   if (selectingRect) {
-    selectionRect = {
-      x1: selectStartX,
-      y1: selectStartY,
-      x2: getDrawingX(mouseX),
-      y2: getDrawingY(mouseY)
-    };
+    selectionRect = { x1: selectStartX, y1: selectStartY, x2: getDrawingX(mouseX), y2: getDrawingY(mouseY) };
     selectingRect = false;
   }
 }
 
 function updateBrushSizeFromSlider(){
-  //convert mouse to UI coordinates
   let uiMouseX = mouseX / canvasScale;
-  //constrain mouseX to slider bounds
   let constrainedX = constrain(uiMouseX, brushSizeSliderX, brushSizeSliderX + brushSizeSliderWidth);
-  //map slider position to brush size
-  brushSize = map(constrainedX, brushSizeSliderX, brushSizeSliderX + brushSizeSliderWidth, minBrushSize, maxBrushSize);
-  brushSize = round(brushSize); //round to integer
+  brushSize = round(map(constrainedX, brushSizeSliderX, brushSizeSliderX + brushSizeSliderWidth, minBrushSize, maxBrushSize));
 }
 
-//convert scaled canvas coordinates to actual drawing coordinates
-function getDrawingX(screenX) {
-  return screenX / canvasScale;
-}
+function getDrawingX(screenX) { return screenX / canvasScale; }
+function getDrawingY(screenY) { return screenY / canvasScale; }
+function getScreenX(drawingX) { return drawingX * canvasScale; }
+function getScreenY(drawingY) { return drawingY * canvasScale; }
 
-function getDrawingY(screenY) {
-  return screenY / canvasScale;
-}
-
-//convert drawing coordinates to scaled canvas coordinates
-function getScreenX(drawingX) {
-  return drawingX * canvasScale;
-}
-
-function getScreenY(drawingY) {
-  return drawingY * canvasScale;
-}
-
-//handle window resize for orientation changes on iPad
 function windowResized() {
-  //recalculate scale
-  let availableWidth = windowWidth - 100;
-  let availableHeight = windowHeight - 200;
-  let scaleX = availableWidth / BASE_WIDTH;
-  let scaleY = availableHeight / BASE_HEIGHT;
-  canvasScale = min(scaleX, scaleY, 1);
-  
-  //resize canvas
+  canvasScale = min((windowWidth - 100) / BASE_WIDTH, (windowHeight - 200) / BASE_HEIGHT, 1);
   resizeCanvas(BASE_WIDTH * canvasScale, BASE_HEIGHT * canvasScale);
 }
 
-//touch support for iPad and mobile devices
-function touchStarted(){
-  //call the same logic as mousePressed
-  mousePressed();
-  //prevent default behavior (like scrolling) when touching canvas
-  return false;
-}
-
-function touchMoved(){
-  //call the same logic as mouseDragged
-  mouseDragged();
-  //prevent default behavior (like scrolling) when dragging on canvas
-  return false;
-}
-
-function touchEnded(){
-  //call the same logic as mouseReleased
-  mouseReleased();
-  //prevent default behavior
-  return false;
-}
+function touchStarted() { mousePressed(); return false; }
+function touchMoved() { mouseDragged(); return false; }
+function touchEnded() { mouseReleased(); return false; }
