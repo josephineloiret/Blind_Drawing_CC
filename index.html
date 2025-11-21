@@ -70,6 +70,22 @@
       /* Optimize touch interactions for drawing */
       touch-action: none;
     }
+    
+    /* Adjust for smaller screens */
+    @media (max-width: 1600px) {
+      #container {
+        padding: 15px;
+      }
+      
+      h1 {
+        font-size: 1.8em;
+      }
+      
+      .subtitle {
+        font-size: 0.9em;
+        margin-bottom: 15px;
+      }
+    }
   </style>
 </head>
 <body>
